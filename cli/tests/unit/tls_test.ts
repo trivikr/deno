@@ -7,6 +7,7 @@ import {
   createResolvable,
   unitTest,
 } from "./test_util.ts";
+import { Server, serveTLS } from "../../../std/http/server.ts";
 import { BufReader, BufWriter } from "../../../std/io/bufio.ts";
 import { TextProtoReader } from "../../../std/textproto/mod.ts";
 
@@ -185,8 +186,23 @@ unitTest(
 unitTest(
   { perms: { read: true, net: true } },
   async function startTls(): Promise<void> {
-    const hostname = "smtp.gmail.com";
-    const port = 587;
+    async function iteratorReq(server: Server): Promise<void> {
+      for await (const req of server) {
+        await req.respond({ body: new TextEncoder().encode("Hello HTTPS") });
+      }
+    }
+
+    const hostname = "localhost";
+    const port = 3500;
+    const options = {
+      hostname,
+      port,
+      certFile: "cli/tests/tls/localhost.crt",
+      keyFile: "cli/tests/tls/localhost.key",
+    };
+
+    const server = serveTLS(options);
+    const p = iteratorReq(server);
     const encoder = new TextEncoder();
 
     let conn = await Deno.connect({
@@ -230,5 +246,7 @@ unitTest(
     }
 
     conn.close();
+    server.close();
+    await p;
   },
 );
